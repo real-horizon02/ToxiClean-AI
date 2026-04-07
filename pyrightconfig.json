@@ -1,0 +1,10 @@
+{
+  "pythonVersion": "3.10",
+  "pythonPlatform": "Windows",
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": ["E:\\PythonLibs\\Python313\\site-packages"],
+  "reportMissingModuleSource": "none",
+  "reportMissingImports": "none",
+  "typeCheckingMode": "basic"
+}

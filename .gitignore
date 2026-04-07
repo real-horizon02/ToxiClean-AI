@@ -1,0 +1,32 @@
+# ============================================================
+# ToxiClean AI — .gitignore
+# ============================================================
+
+# Secrets
+.env
+credentials.json
+token.json
+
+# Intermediates
+.tmp/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/

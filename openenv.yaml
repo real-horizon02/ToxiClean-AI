@@ -1,0 +1,147 @@
+name: ToxiClean AI
+version: "1.0.0"
+description: >
+  A production-ready reinforcement learning environment for intelligent
+  content moderation. An agent learns to classify online content across
+  three tasks of increasing difficulty — spam detection, toxicity
+  classification, and contextual moderation — receiving structured reward
+  signals that mirror real-world moderation policies.
+
+author: ToxiClean AI Team
+license: MIT
+homepage: https://huggingface.co/spaces/toxiclean-ai/toxiclean-env
+
+# ---------------------------------------------------------------------------
+# Interface
+# ---------------------------------------------------------------------------
+interface:
+  reset: "env.environment.ToxiCleanEnv.reset"
+  step: "env.environment.ToxiCleanEnv.step"
+  state: "env.environment.ToxiCleanEnv.state"
+
+# ---------------------------------------------------------------------------
+# Tasks
+# ---------------------------------------------------------------------------
+tasks:
+  - id: spam_detection
+    name: "Spam Detection"
+    difficulty: easy
+    description: >
+      Detect obvious spam messages including promotional content,
+      phishing attempts, and get-rich-quick schemes in English and Hinglish.
+    total_steps: 12
+    module: "env.tasks.spam"
+    grader: "env.tasks.spam.grade"
+
+  - id: toxicity_classification
+    name: "Toxicity Classification"
+    difficulty: medium
+    description: >
+      Classify content by toxicity severity — clean, mild insult, severe
+      abuse, or critical threat — across English and Hinglish. Requires
+      differentiating legitimate criticism from targeted harassment.
+    total_steps: 12
+    module: "env.tasks.toxicity"
+    grader: "env.tasks.toxicity.grade"
+
+  - id: contextual_moderation
+    name: "Contextual Moderation"
+    difficulty: hard
+    description: >
+      Understand intent and context before acting. Surface keywords can
+      be misleading: idiomatic phrases, sarcasm, polite framing of hate
+      speech, and cross-language nuance must all be handled correctly.
+    total_steps: 12
+    module: "env.tasks.contextual"
+    grader: "env.tasks.contextual.grade"
+
+# ---------------------------------------------------------------------------
+# Action space
+# ---------------------------------------------------------------------------
+action_space:
+  type: discrete
+  actions:
+    - id: ALLOW
+      description: "Content is safe. No action required."
+    - id: FLAG
+      description: "Content is suspicious. Queue for human review."
+    - id: DELETE
+      description: "Content is harmful. Remove immediately."
+    - id: ESCALATE
+      description: "Critical threat. Escalate to safety team."
+
+# ---------------------------------------------------------------------------
+# Observation space
+# ---------------------------------------------------------------------------
+observation_space:
+  type: structured
+  schema:
+    content:
+      type: string
+      description: "Raw text content submitted for moderation."
+      max_length: 4096
+    metadata:
+      type: object
+      properties:
+        user_history:
+          type: string
+          description: "Submitting user's prior moderation record."
+        platform:
+          type: string
+          description: "Platform surface where content appeared."
+        language:
+          type: string
+          description: "BCP-47 language tag (en, hi, hinglish)."
+    step_index:
+      type: integer
+      description: "Zero-based step index within the current episode."
+    task_name:
+      type: string
+      description: "Active task identifier."
+
+# ---------------------------------------------------------------------------
+# Reward design
+# ---------------------------------------------------------------------------
+reward:
+  correct_moderation: +1.0
+  partial_correct: +0.5
+  false_positive: -0.7
+  missed_harm: -1.0
+  over_moderation: -0.5
+  reputation_modifier:
+    repeat_offender:
+      correct_bonus: +0.1
+      incorrect_penalty: -0.2
+    one_prior_warning:
+      correct_bonus: +0.05
+      incorrect_penalty: -0.1
+    clean:
+      correct_bonus: 0.0
+      incorrect_penalty: 0.0
+
+# ---------------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------------
+metadata:
+  language_support:
+    - English
+    - Hinglish (Hindi + English code-switching)
+  features:
+    - deterministic_grading
+    - reputation_aware_rewards
+    - explainable_feedback
+    - multi_language
+    - three_difficulty_tiers
+  evaluation:
+    metric: normalised_mean_reward
+    formula: "(mean_reward + 1.2) / 2.4  clamped to [0, 1]"
+    baseline_score:
+      spam_detection: 0.71
+      toxicity_classification: 0.65
+      contextual_moderation: 0.58
+      overall: 0.65
+  docker:
+    image: toxiclean-ai
+    python_version: "3.10"
+    run_command: "python inference.py"
+  requirements_file: requirements.txt
