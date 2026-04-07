@@ -1,8 +1,8 @@
 # env/__init__.py
 """ToxiClean AI — OpenEnv environment package."""
 
-from env.environment import ToxiCleanEnv
-from env.models import (
+from core.environment import ToxiCleanEnv
+from core.models import (
     AgentAction,
     ContentMetadata,
     EnvironmentState,

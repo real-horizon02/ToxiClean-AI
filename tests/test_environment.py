@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from env.environment import ToxiCleanEnv
-from env.models import EnvironmentState, ModerationAction, Observation
+from core.environment import ToxiCleanEnv
+from core.models import EnvironmentState, ModerationAction, Observation
 
 
 # ---------------------------------------------------------------------------

@@ -229,7 +229,7 @@ Scores are normalised: `(mean_reward + 1.2) / 2.4`, clamped to `[0, 1]`.
 ## 🧩 Programmatic Usage
 
 ```python
-from env import ToxiCleanEnv, ModerationAction
+from core import ToxiCleanEnv, ModerationAction
 
 env = ToxiCleanEnv(task_name="spam_detection")
 obs = env.reset()
@@ -252,7 +252,7 @@ while True:
 
 ```
 ToxiClean AI/
-├── env/
+├── core/
 │   ├── __init__.py
 │   ├── environment.py      ← Core ToxiCleanEnv (OpenEnv interface)
 │   ├── models.py           ← Pydantic typed models
@@ -263,13 +263,12 @@ ToxiClean AI/
 │       └── contextual.py   ← Task 3: Contextual moderation
 │
 ├── execution/              ← Existing deterministic scripts
-├── directives/             ← SOPs (AGENTS.md architecture)
+├── directives/             ← SOPs (Note: Ignored in repository)
 │
 ├── inference.py            ← Baseline LLM agent runner
 ├── openenv.yaml            ← OpenEnv specification
 ├── Dockerfile
 ├── requirements.txt
-├── .env.example
 └── README.md
 ```
 

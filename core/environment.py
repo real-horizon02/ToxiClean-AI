@@ -36,13 +36,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from env.models import (
+from core.models import (
     EnvironmentState,
     ModerationAction,
     Observation,
     StepResult,
 )
-from env.tasks import contextual, spam, toxicity
+from core.tasks import contextual, spam, toxicity
 
 logger = logging.getLogger(__name__)
 

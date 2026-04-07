@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from env.models import ContentMetadata, ModerationAction, Observation
+from core.models import ContentMetadata, ModerationAction, Observation
 
 # ---------------------------------------------------------------------------
 # Internal dataset

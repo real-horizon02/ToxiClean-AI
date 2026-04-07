@@ -27,8 +27,8 @@ from typing import Generator
 
 import gradio as gr
 
-from env.environment import ToxiCleanEnv
-from env.models import ModerationAction, Observation
+from core.environment import ToxiCleanEnv
+from core.models import ModerationAction, Observation
 
 # ── Theme ─────────────────────────────────────────────────────────────────
 _THEME = gr.themes.Soft(
