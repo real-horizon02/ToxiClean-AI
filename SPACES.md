@@ -3,9 +3,8 @@ title: ToxiClean AI
 emoji: 🧹
 colorFrom: purple
 colorTo: violet
-sdk: gradio
-sdk_version: 4.44.1
-app_file: app.py
+sdk: docker
+app_port: 7860
 pinned: true
 license: mit
 short_description: OpenEnv RL environment for intelligent content moderation
@@ -20,3 +19,15 @@ tags:
 # ToxiClean AI
 
 See [README.md](README.md) for full documentation.
+
+## API Endpoints
+
+The Space exposes the full OpenEnv REST interface:
+
+| Method | Path     | Description                        |
+|--------|----------|------------------------------------|
+| POST   | /reset   | Reset episode, get first observation |
+| POST   | /step    | Take a moderation action           |
+| GET    | /state   | Get current environment state      |
+| GET    | /health  | Liveness check                     |
+| GET    | /ui      | Gradio interactive demo            |

@@ -1,3 +1,21 @@
+---
+title: ToxiClean AI
+emoji: 🧹
+colorFrom: purple
+colorTo: violet
+sdk: docker
+app_port: 7860
+pinned: true
+license: mit
+short_description: OpenEnv RL environment for intelligent content moderation
+tags:
+  - reinforcement-learning
+  - content-moderation
+  - openenv
+  - nlp
+  - hackathon
+---
+
 # ToxiClean AI 🧹
 
 > **An OpenEnv reinforcement learning environment where an AI agent learns to moderate online content — intelligently, contextually, and at scale.**
@@ -145,17 +163,47 @@ cd toxiclean-ai
 pip install -r requirements.txt
 ```
 
-### 2. Configure secrets
+### 2. Configure environment variables
 
 ```bash
 cp .env.example .env
-# Edit .env and fill in OPENAI_API_KEY
 ```
 
-### 3. Run the baseline
+Edit `.env` and set:
+
+```env
+# Your LLM API key — no default, must be set
+HF_TOKEN=your-api-key-here
+
+# Defaults are already set in code; override here if needed:
+API_BASE_URL=https://router.huggingface.co/v1   # or https://api.openai.com/v1
+MODEL_NAME=Qwen/Qwen2.5-72B-Instruct           # or gpt-4o-mini
+```
+
+> **Provider guide:**
+> | Provider | `API_BASE_URL` | `HF_TOKEN` |
+> |----------|---------------|----------|
+> | HuggingFace Router | `https://router.huggingface.co/v1` | `hf_...` |
+> | OpenAI | `https://api.openai.com/v1` | `sk-proj-...` |
+> | Together AI | `https://api.together.xyz/v1` | Together key |
+> | Groq | `https://api.groq.com/openai/v1` | Groq key |
+
+### 3. Launch the Dashboard
 
 ```bash
-# Run all three tasks
+python app.py
+```
+
+Visit **`http://localhost:7860`** in your browser — a full visual dashboard lets you:
+- Select any of the 3 tasks
+- Submit moderation decisions step-by-step
+- See real-time reward feedback & running score
+- Review step history and grader explanations
+
+### 4. Run the baseline inference script
+
+```bash
+# Run all three tasks (structured [START]/[STEP]/[END] stdout logs)
 python inference.py
 
 # Run a specific task
@@ -163,22 +211,12 @@ python inference.py --task spam_detection
 python inference.py --task toxicity_classification
 python inference.py --task contextual_moderation
 
-# Verbose mode (shows per-step reasoning)
+# Verbose mode (per-step reasoning)
 python inference.py --verbose
 
 # Use a different model
 python inference.py --model gpt-4o
 ```
-
-### 4. Launch the Web UI
-
-Run the interactive Gradio demo locally:
-
-```bash
-python app.py
-```
-
-Visit `http://localhost:7860` in your browser to start moderating!
 
 ---
 
@@ -194,8 +232,10 @@ docker build -t toxiclean-ai .
 
 ```bash
 docker run --rm \
-  -e OPENAI_API_KEY=sk-... \
+  -e HF_TOKEN=your-api-key-here \
+  -e API_BASE_URL=https://api.openai.com/v1 \
   -e MODEL_NAME=gpt-4o-mini \
+  -p 7860:7860 \
   toxiclean-ai
 ```
 

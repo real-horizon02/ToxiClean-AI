@@ -15,9 +15,9 @@ homepage: https://huggingface.co/spaces/toxiclean-ai/toxiclean-env
 # Interface
 # ---------------------------------------------------------------------------
 interface:
-  reset: "env.environment.ToxiCleanEnv.reset"
-  step: "env.environment.ToxiCleanEnv.step"
-  state: "env.environment.ToxiCleanEnv.state"
+  reset: "core.environment.ToxiCleanEnv.reset"
+  step: "core.environment.ToxiCleanEnv.step"
+  state: "core.environment.ToxiCleanEnv.state"
 
 # ---------------------------------------------------------------------------
 # Tasks
@@ -30,8 +30,8 @@ tasks:
       Detect obvious spam messages including promotional content,
       phishing attempts, and get-rich-quick schemes in English and Hinglish.
     total_steps: 12
-    module: "env.tasks.spam"
-    grader: "env.tasks.spam.grade"
+    module: "core.tasks.spam"
+    grader: "core.tasks.spam.grade"
 
   - id: toxicity_classification
     name: "Toxicity Classification"
@@ -41,8 +41,8 @@ tasks:
       abuse, or critical threat — across English and Hinglish. Requires
       differentiating legitimate criticism from targeted harassment.
     total_steps: 12
-    module: "env.tasks.toxicity"
-    grader: "env.tasks.toxicity.grade"
+    module: "core.tasks.toxicity"
+    grader: "core.tasks.toxicity.grade"
 
   - id: contextual_moderation
     name: "Contextual Moderation"
@@ -52,8 +52,8 @@ tasks:
       be misleading: idiomatic phrases, sarcasm, polite framing of hate
       speech, and cross-language nuance must all be handled correctly.
     total_steps: 12
-    module: "env.tasks.contextual"
-    grader: "env.tasks.contextual.grade"
+    module: "core.tasks.contextual"
+    grader: "core.tasks.contextual.grade"
 
 # ---------------------------------------------------------------------------
 # Action space
@@ -143,5 +143,46 @@ metadata:
   docker:
     image: toxiclean-ai
     python_version: "3.10"
-    run_command: "python inference.py"
+    run_command: "python server.py"
+    ports:
+      - 7860
   requirements_file: requirements.txt
+
+# ---------------------------------------------------------------------------
+# Mandatory environment variables
+# ---------------------------------------------------------------------------
+env_vars:
+  API_BASE_URL:
+    description: "The API endpoint for the LLM (OpenAI-compatible base URL)."
+    default: "https://router.huggingface.co/v1"
+    required: true
+  MODEL_NAME:
+    description: "The model identifier to use for inference."
+    default: "Qwen/Qwen2.5-72B-Instruct"
+    required: true
+  HF_TOKEN:
+    description: "Your Hugging Face API token used as the API key for LLM calls."
+    required: true
+    secret: true
+
+# ---------------------------------------------------------------------------
+# HTTP interface (OpenEnv spec)
+# ---------------------------------------------------------------------------
+http_endpoints:
+  reset:
+    method: POST
+    path: /reset
+    description: "Reset an episode and receive the first observation."
+  step:
+    method: POST
+    path: /step
+    description: "Apply a moderation action and advance the environment."
+  state:
+    method: GET
+    path: /state
+    description: "Return the current environment state snapshot."
+  health:
+    method: GET
+    path: /health
+    description: "Liveness probe — returns 200 when the service is up."
+

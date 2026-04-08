@@ -3,31 +3,39 @@ inference.py
 
 ToxiClean AI — Baseline inference script for the OpenEnv hackathon evaluation.
 
-This script runs an LLM agent through all three tasks using an OpenAI-compatible
-API.  It strictly follows the log format required by the evaluator:
-
-    [START]
-    task: <task_name>
-
-    [STEP]
-    action: <ACTION>
-    reward: <float>
-
-    [END]
-    final_score: <float>
-
-Environment variables (required)
+MANDATORY ENVIRONMENT VARIABLES
 ---------------------------------
-    OPENAI_API_KEY   : API key for the LLM provider
-    API_BASE_URL     : Base URL  (default: https://api.openai.com/v1)
-    MODEL_NAME       : Model to use (default: gpt-4o-mini)
+    API_BASE_URL   The API endpoint for the LLM.
+                   Default: https://router.huggingface.co/v1
+    MODEL_NAME     The model identifier to use for inference.
+                   Default: Qwen/Qwen2.5-72B-Instruct
+    HF_TOKEN       Your Hugging Face / API key.
+
+STDOUT FORMAT (STRICTLY ENFORCED)
+----------------------------------
+One [START] line at episode begin:
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+
+One [STEP] line per step:
+    [STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+
+One [END] line after episode closes (always emitted):
+    [END] success=<true|false> steps=<n> score=<0.000> rewards=<r1,r2,...,rn>
+
+    Rules:
+      - reward/rewards formatted to 2 decimal places
+      - score formatted to 3 decimal places
+      - done and success are lowercase booleans: true or false
+      - error is the raw error string, or null if none
+      - ALL fields on a SINGLE line with no newlines within a line
 
 Usage
 -----
     python inference.py
     python inference.py --task spam_detection
-    python inference.py --task toxicity_classification --verbose
+    python inference.py --task toxicity_classification
     python inference.py --task contextual_moderation
+    python inference.py --verbose
 """
 
 from __future__ import annotations
@@ -38,7 +46,7 @@ import logging
 import os
 import sys
 import time
-from typing import Any
+from typing import Any, List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -62,8 +70,20 @@ logger = logging.getLogger("toxiclean.inference")
 # Constants
 # ---------------------------------------------------------------------------
 VALID_TASKS = ["spam_detection", "toxicity_classification", "contextual_moderation"]
-DEFAULT_API_BASE = "https://api.openai.com/v1"
-DEFAULT_MODEL = "gpt-4o-mini"
+BENCHMARK = "toxiclean"
+
+# ---------------------------------------------------------------------------
+# Mandatory environment variables (per submission spec)
+# Defaults set ONLY for API_BASE_URL and MODEL_NAME — NOT for HF_TOKEN
+# ---------------------------------------------------------------------------
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")  # No default — must be set in environment
+
+# Optional — only needed if using from_docker_image()
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+
+SUCCESS_SCORE_THRESHOLD = 0.5  # normalized score in [0, 1]
 
 # System prompt that shapes the agent's moderation persona
 _SYSTEM_PROMPT = """You are a professional content moderation AI agent.
@@ -93,25 +113,54 @@ Respond with a single JSON object — NO markdown, NO extra text:
 
 
 # ---------------------------------------------------------------------------
+# Mandatory stdout log helpers (single-line format per spec)
+# ---------------------------------------------------------------------------
+
+def log_start(task: str, env: str, model: str) -> None:
+    """Emit the [START] line. Must be a single line."""
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    """Emit a [STEP] line. Must be a single line."""
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    """Emit the [END] line. Must be a single line."""
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
+        flush=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # LLM client helpers
 # ---------------------------------------------------------------------------
 
 def _build_client() -> OpenAI:
-    """Construct an OpenAI-compatible client from environment variables."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    """Construct an OpenAI-compatible client from environment variables.
+    
+    Uses HF_TOKEN as the API key (mandatory, no default).
+    API_BASE_URL and MODEL_NAME have defaults per spec.
+    """
+    if not HF_TOKEN:
         raise EnvironmentError(
-            "OPENAI_API_KEY is not set. "
-            "Add it to your .env file or export it as an environment variable."
+            "HF_TOKEN is not set. "
+            "Add it to your .env file or export it as an environment variable.\n"
+            "  export HF_TOKEN=hf_your_token_here"
         )
-    base_url = os.getenv("API_BASE_URL", DEFAULT_API_BASE).rstrip("/")
-    return OpenAI(api_key=api_key, base_url=base_url)
+    return OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL.rstrip("/"))
 
 
 def _observation_to_user_message(obs: Observation) -> str:
-    """
-    Convert an Observation into a user-facing prompt string for the LLM.
-    """
+    """Convert an Observation into a user-facing prompt string for the LLM."""
     meta = obs.metadata
     return (
         f"=== CONTENT TO MODERATE ===\n"
@@ -138,6 +187,7 @@ def _call_llm(
     Retries up to `max_retries` times on transient errors.
     Falls back to ALLOW on persistent failure (conservative fail-safe).
     """
+    last_error: Optional[str] = None
     for attempt in range(1, max_retries + 1):
         try:
             response = client.chat.completions.create(
@@ -159,17 +209,19 @@ def _call_llm(
             return parsed
 
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            last_error = str(exc)
             logger.warning("Attempt %d: parse error — %s", attempt, exc)
             if attempt == max_retries:
                 logger.error("All retries exhausted. Defaulting to ALLOW.")
-                return {"action": "ALLOW", "reasoning": "Parse failure — default safe."}
-            time.sleep(0.5 * attempt)  # brief back-off
+                return {"action": "ALLOW", "reasoning": "Parse failure — default safe.", "_error": last_error}
+            time.sleep(0.5 * attempt)
 
         except Exception as exc:  # network/API errors
+            last_error = str(exc)
             logger.warning("Attempt %d: API error — %s", attempt, exc)
             if attempt == max_retries:
                 logger.error("All retries exhausted. Defaulting to ALLOW.")
-                return {"action": "ALLOW", "reasoning": "API failure — default safe."}
+                return {"action": "ALLOW", "reasoning": "API failure — default safe.", "_error": last_error}
             time.sleep(1.0 * attempt)
 
     return {"action": "ALLOW", "reasoning": "Unexpected exit — default safe."}
@@ -191,60 +243,87 @@ def run_task(
     Returns
     -------
     float
-        Final normalised score for the episode.
+        Final normalised score for the episode (clamped to [0, 1]).
     """
     env = ToxiCleanEnv(task_name=task_name)
     obs = env.reset()
 
-    # ---- [START] log ----
-    print(f"\n[START]")
-    print(f"task: {task_name}")
+    rewards: List[float] = []
+    steps_taken = 0
+    score = 0.0
+    success = False
 
-    episode_rewards: list[float] = []
+    # ---- [START] line ----
+    log_start(task=task_name, env=BENCHMARK, model=model)
 
-    while True:
-        # Build the LLM prompt from the current observation
-        user_message = _observation_to_user_message(obs)
+    try:
+        step = 0
+        last_error: Optional[str] = None
 
-        # Get action from agent
-        llm_response = _call_llm(client, model, user_message)
-        action_str = llm_response.get("action", "ALLOW").upper().strip()
-        reasoning = llm_response.get("reasoning", "")
+        while True:
+            state = env.state()
+            if state.done:
+                break
 
-        if verbose:
-            print(f"\n  [obs] {obs.content[:80]}...")
-            print(f"  [agent] action={action_str} | reason={reasoning}")
+            step += 1
 
-        # Step environment
-        next_obs, reward, done, info = env.step(ModerationAction(action_str))
+            # Build the LLM prompt from the current observation
+            user_message = _observation_to_user_message(obs)
 
-        # ---- [STEP] log ----
-        print(f"\n[STEP]")
-        print(f"action: {action_str}")
-        print(f"reward: {reward}")
+            # Get action from agent
+            llm_response = _call_llm(client, model, user_message)
+            action_str = llm_response.get("action", "ALLOW").upper().strip()
+            reasoning = llm_response.get("reasoning", "")
+            last_error = llm_response.get("_error", None)
 
-        if verbose:
-            print(f"  correct: {info.get('correct_action')} | score: {info.get('grader_score')}")
-            print(f"  reason: {info.get('reason')}")
+            if verbose:
+                print(f"[DEBUG] step={step} content={obs.content[:60]!r}...", flush=True)
+                print(f"[DEBUG] agent action={action_str} | reason={reasoning}", flush=True)
 
-        episode_rewards.append(reward)
+            # Step environment
+            next_obs, reward, done, info = env.step(ModerationAction(action_str))
 
-        if done:
-            break
+            rewards.append(reward)
+            steps_taken = step
 
-        obs = next_obs
+            # ---- [STEP] line (single line, per spec) ----
+            log_step(
+                step=step,
+                action=action_str,
+                reward=reward,
+                done=done,
+                error=last_error,
+            )
 
-    # Compute final score: mean reward, normalised to [0, 1]
-    # Raw rewards range from -1.0 to +1.0 (plus reputation modifier up to ±0.2)
-    # We normalise: final_score = (mean_reward + 1.2) / 2.4 clamped to [0, 1]
-    mean_reward = sum(episode_rewards) / len(episode_rewards) if episode_rewards else 0.0
-    final_score = max(0.0, min(1.0, (mean_reward + 1.2) / 2.4))
+            if verbose:
+                print(
+                    f"[DEBUG] correct={info.get('correct_action')} "
+                    f"grader_score={info.get('grader_score')} "
+                    f"reason={info.get('reason')}",
+                    flush=True,
+                )
 
-    # ---- [END] log ----
-    print(f"\n[END]")
-    print(f"final_score: {round(final_score, 4)}")
+            obs = next_obs
 
-    return final_score
+            if done:
+                break
+
+        # Compute final normalised score: (mean_reward + 1.2) / 2.4 clamped to [0, 1]
+        mean_reward = sum(rewards) / len(rewards) if rewards else 0.0
+        score = max(0.0, min(1.0, (mean_reward + 1.2) / 2.4))
+        success = score >= SUCCESS_SCORE_THRESHOLD
+
+    except Exception as exc:
+        logger.error("Unexpected error in run_task: %s", exc)
+        # Ensure [END] is always emitted even on crash
+        score = 0.0
+        success = False
+
+    finally:
+        # ---- [END] line — always emitted ----
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+    return score
 
 
 # ---------------------------------------------------------------------------
@@ -280,37 +359,39 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Allow CLI overrides
+    # Allow CLI overrides (update module-level constants)
+    global API_BASE_URL, MODEL_NAME, HF_TOKEN
     if args.api_base:
         os.environ["API_BASE_URL"] = args.api_base
+        API_BASE_URL = args.api_base
     if args.model:
         os.environ["MODEL_NAME"] = args.model
+        MODEL_NAME = args.model
 
-    model = os.getenv("MODEL_NAME", DEFAULT_MODEL)
-
-    print(f"=== ToxiClean AI — OpenEnv Baseline ===")
-    print(f"Model     : {model}")
-    print(f"API Base  : {os.getenv('API_BASE_URL', DEFAULT_API_BASE)}")
+    print(f"=== ToxiClean AI — OpenEnv Baseline ===", flush=True)
+    print(f"Model     : {MODEL_NAME}", flush=True)
+    print(f"API Base  : {API_BASE_URL}", flush=True)
+    print(f"Benchmark : {BENCHMARK}", flush=True)
 
     try:
         client = _build_client()
     except EnvironmentError as exc:
-        print(f"\n[ERROR] {exc}", file=sys.stderr)
+        print(f"\n[ERROR] {exc}", file=sys.stderr, flush=True)
         sys.exit(1)
 
     tasks_to_run = VALID_TASKS if args.task == "all" else [args.task]
     all_scores: dict[str, float] = {}
 
     for task in tasks_to_run:
-        score = run_task(task, client, model, verbose=args.verbose)
+        score = run_task(task, client, MODEL_NAME, verbose=args.verbose)
         all_scores[task] = score
 
     if len(tasks_to_run) > 1:
         overall = sum(all_scores.values()) / len(all_scores)
-        print(f"\n=== OVERALL SCORE ===")
+        print(f"\n=== OVERALL SCORE ===", flush=True)
         for task, score in all_scores.items():
-            print(f"  {task}: {score:.4f}")
-        print(f"  AVERAGE: {overall:.4f}")
+            print(f"  {task}: {score:.4f}", flush=True)
+        print(f"  AVERAGE: {overall:.4f}", flush=True)
 
 
 if __name__ == "__main__":

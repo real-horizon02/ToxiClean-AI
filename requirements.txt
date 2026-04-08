@@ -5,21 +5,26 @@
 python-dotenv>=1.0.0       # .env file loading
 pydantic>=2.0.0            # Typed models / validation
 
-# ── LLM Client ───────────────────────────────────────────────────────────
+# ── LLM Client (mandatory: participants must use OpenAI client) ───────────
 openai>=1.0.0              # OpenAI-compatible API client (works with any base_url)
 
 # ── YAML support (for openenv.yaml) ──────────────────────────────────────
 pyyaml>=6.0.0
 
+# ── Web UI (Gradio) ───────────────────────────────────────────────────────
+gradio>=4.0.0              # Interactive web demo
+
+# ── REST API server (OpenEnv HTTP endpoints: /reset, /step, /state) ───────
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
 # ── Testing ───────────────────────────────────────────────────────────────
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+httpx>=0.27.0              # For test client
 
 # ── Optional: existing project dependencies ───────────────────────────────
 # (keeping them so existing execution/ scripts still work)
 supabase>=2.0.0
-fastapi>=0.110.0
-uvicorn[standard]>=0.29.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
-httpx>=0.27.0

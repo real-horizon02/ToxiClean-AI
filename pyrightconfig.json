@@ -1,10 +1,18 @@
 {
-  "pythonVersion": "3.10",
+  "pythonVersion": "3.14",
   "pythonPlatform": "Windows",
-  "venvPath": ".",
-  "venv": ".venv",
-  "extraPaths": ["E:\\PythonLibs\\Python313\\site-packages"],
+  "include": [
+    "core",
+    "tests",
+    "app.py",
+    "inference.py",
+    "cli_demo.py"
+  ],
+  "exclude": [
+    "**/env",
+    "**/__pycache__",
+    ".git"
+  ],
   "reportMissingModuleSource": "none",
-  "reportMissingImports": "none",
   "typeCheckingMode": "basic"
 }
