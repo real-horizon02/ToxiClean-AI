@@ -213,6 +213,8 @@ _THEME = gr.themes.Soft(
 with gr.Blocks(
     theme=_THEME,
     title="ToxiClean AI — Content Moderation Dashboard",
+    server_name="0.0.0.0",
+    server_port=int(os.getenv("PORT", "7860")),
     css="""
     .reward-card { border-radius: 12px; padding: 12px; }
     .score-row { font-size: 1.1em; }
@@ -314,7 +316,4 @@ Select a task, start an episode, then pick the right moderation action for each 
 
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.getenv("PORT", "7860")),
-    )
+    demo.launch(show_error=True)
