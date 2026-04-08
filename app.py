@@ -213,8 +213,6 @@ _THEME = gr.themes.Soft(
 with gr.Blocks(
     theme=_THEME,
     title="ToxiClean AI — Content Moderation Dashboard",
-    server_name="0.0.0.0",
-    server_port=int(os.getenv("PORT", "7860")),
     css="""
     .reward-card { border-radius: 12px; padding: 12px; }
     .score-row { font-size: 1.1em; }
