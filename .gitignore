@@ -33,9 +33,6 @@ logs/
 # Added by code-review-graph
 .code-review-graph/
 
-# Local server package (root server.py is the canonical entry point)
-server/
-
 # Local-only dev artifacts
 .claude/
 .mcp.json
