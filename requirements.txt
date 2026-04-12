@@ -1,6 +1,9 @@
 # ToxiClean AI — Python Dependencies
 # Supports Python 3.10+
 
+# ── OpenEnv (required by hackathon validator) ─────────────────────────────
+openenv-core>=0.2.0        # OpenEnv specification compliance
+
 # ── Core ──────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0       # .env file loading
 pydantic>=2.0.0            # Typed models / validation

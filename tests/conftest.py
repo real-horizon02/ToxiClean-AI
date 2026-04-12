@@ -92,3 +92,17 @@ sys.modules.setdefault("gradio", _gr_stub)
 _app_stub = types.ModuleType("app")
 _app_stub.demo = _gr_stub.Blocks()  # a harmless _FakeBlocks instance
 sys.modules.setdefault("app", _app_stub)
+
+# ---------------------------------------------------------------------------
+# 3. Also stub `server.app` so any import of that canonical path works too.
+# ---------------------------------------------------------------------------
+
+# We need a "server" package stub first (can't conflict with real server.py)
+_server_pkg_stub = types.ModuleType("server")
+_server_pkg_stub.app = None  # placeholder; populated below
+sys.modules.setdefault("server", _server_pkg_stub)
+
+_server_app_stub = types.ModuleType("server.app")
+_server_app_stub.app = None  # the FastAPI app — filled in after server import
+sys.modules.setdefault("server.app", _server_app_stub)
+

@@ -223,16 +223,28 @@ async def root():
 # Gradio UI (mounted at /ui)
 # ---------------------------------------------------------------------------
 
-from app import demo as gradio_demo  # noqa: E402
+try:
+    from app import demo as gradio_demo  # noqa: E402
 
-app = gr.mount_gradio_app(app, gradio_demo, path="/ui")
+    app = gr.mount_gradio_app(app, gradio_demo, path="/ui")
+except Exception as _gradio_err:
+    import logging as _log
+
+    _log.getLogger("server").warning(
+        "Gradio UI could not be mounted: %s — REST API is still available.", _gradio_err
+    )
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-if __name__ == "__main__":
+def main():
+    """Entry point for [project.scripts] — called by `server` console script."""
     import uvicorn
 
     port = int(os.getenv("PORT", "7860"))
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
+
+
+if __name__ == "__main__":
+    main()
